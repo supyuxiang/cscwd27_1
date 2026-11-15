@@ -94,7 +94,17 @@ class LoopFuseDataset(Dataset):
         raise RuntimeError(f"Failed to open images starting at index {index}: {last_error}")
 
 
-def loopfuse_collator(processor, max_length: int):
+def load_debate_table(path: str | Path) -> dict[str, torch.Tensor]:
+    """Map sample id -> (4, hidden) from the Chinese BERT trajectory file."""
+    payload = torch.load(path, map_location="cpu", weights_only=False)
+    hidden = payload["hidden"]
+    ids = [str(item) for item in payload["ids"]]
+    if hidden.ndim != 3 or hidden.size(1) != 4 or hidden.size(0) != len(ids):
+        raise ValueError(f"debate hidden must be (N, 4, d) aligned with ids, got {tuple(hidden.shape)} and {len(ids)} ids.")
+    return {item_id: hidden[index] for index, item_id in enumerate(ids)}
+
+
+def loopfuse_collator(processor, max_length: int, debate_hidden: dict[str, torch.Tensor] | None = None):
 
     def collate_fn(batch: list[dict]) -> dict:
         texts = [(sample["text"] or "").strip() or "." for sample in batch]
@@ -107,6 +117,14 @@ def loopfuse_collator(processor, max_length: int):
             max_length=max_length,
         )
         encoded["labels"] = torch.tensor([int(sample["label"]) for sample in batch], dtype=torch.long)
+        if debate_hidden is not None:
+            rows = []
+            for sample in batch:
+                row = debate_hidden.get(str(sample["id"]))
+                if row is None:
+                    raise KeyError(f"No debate hidden for sample id={sample['id']}")
+                rows.append(row)
+            encoded["debate_hidden"] = torch.stack(rows, dim=0)
         return encoded
 
     return collate_fn

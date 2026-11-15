@@ -15,7 +15,7 @@ from pathlib import Path
 
 ROOT = Path("/home/yxfeng/cscwd27_loopfuse")
 SBATCH = ROOT / "scripts/eval_cnclip_l2_imagenet.sbatch"
-OUT = Path(os.environ.get("CNCLIP_MID_OUT", "/data3/yxfeng/experiments/cnclip_midtrain_l2_lr2e-5"))
+OUT = Path(os.environ.get("CNCLIP_MID_OUT", "/data3/yxfeng/experiments/cnclip_midtrain_l2_lr5e-5"))
 MIN_CKPT_BYTES = 2_000_000_000
 
 
@@ -120,7 +120,7 @@ def open_swanlab():
     if not key:
         raise SystemExit("SWANLAB_API_KEY is not set")
     project = os.environ.pop("SWANLAB_PROJECT", "cnclip-midtrain")
-    name = os.environ.pop("SWANLAB_EXP", "loop2-lr2e-5")
+    name = os.environ.pop("SWANLAB_EXP", "loop2-lr5e-5")
     mode = os.environ.pop("SWANLAB_MODE", "online")
     workspace = os.environ.pop("SWANLAB_WORKSPACE", "").strip()
     os.environ["SWANLAB_API_KEY"] = key
@@ -136,9 +136,9 @@ def open_swanlab():
             "data": "cnclip_pretrain",
             "epochs": 3,
             "gpus": 4,
-            "node": "node3",
+            "node": "node7",
             "global_batch": 256,
-            "lr": 2e-5,
+            "lr": 5e-5,
             "weight_decay": 0.01,
             "lr_warmup": 2000,
             "loop_warmup": 0,

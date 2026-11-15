@@ -62,7 +62,12 @@ def _core_kwargs(config: dict) -> dict:
 
 
 def _build_core(config: dict, backbone: str) -> nn.Module:
-    return _loopfuse_class(backbone)(**_core_kwargs(config))
+    kwargs = _core_kwargs(config)
+    if backbone == "chinese":
+        # debate_dim=0 keeps the plain looped-tower model (no debate branch).
+        kwargs["debate_dim"] = int(config.get("debate_dim", 0))
+        kwargs["d_model"] = int(config.get("d_model", 512))
+    return _loopfuse_class(backbone)(**kwargs)
 
 
 def _adopt(module: nn.Module, core: nn.Module) -> None:

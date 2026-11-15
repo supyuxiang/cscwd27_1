@@ -1,0 +1,35 @@
+model_type: chinese
+backbone: chinese
+clip_name: /data3/yxfeng/models/clip/chinese-clip-vit-base-patch16
+n_heads: 8
+num_heads_kv: 4
+dropout: 0.1
+num_classes: 2
+train_jsonl: /home/yxfeng/cscwd27_loopfuse/data/weibo/train.jsonl
+val_jsonl: ""
+test_jsonl: /home/yxfeng/cscwd27_loopfuse/data/weibo/test.jsonl
+image_root: ""
+val_ratio: 0.1
+max_text_length: 512
+batch_size: 32
+num_workers: 4
+epochs: 50
+lr: 2.0e-5
+min_lr: 2.0e-6
+weight_decay: 1.0e-4
+patience: 5
+seed: 42
+output_dir: outputs/weibo_cnclip_loop2_debate
+# Looped Chinese CLIP (2 loops, pretrained weights) plus the debate branch.
+# The debate features are the 4 offline debate turns pooled by XLM-R-large.
+num_loops: 2
+d_model: 512
+debate_dim: 1024
+debate_hidden: /data3/yxfeng/cscwd27_loopfuse/weibo_debate/hidden.pt
+grad_accum_steps: 1
+amp: true
+max_grad_norm: 1.0
+freeze_backbone: false
+swanlab_mode: disabled
+swanlab_project: loopfuse
+run_name: weibo-cnclip-loop2-debate

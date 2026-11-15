@@ -1,0 +1,36 @@
+model_type: chinese
+backbone: chinese
+clip_name: /data3/yxfeng/models/clip/chinese-clip-vit-base-patch16
+n_heads: 8
+num_heads_kv: 4
+dropout: 0.1
+num_classes: 2
+train_jsonl: /home/yxfeng/cscwd27_loopfuse/data/weibo/train.jsonl
+val_jsonl: ""
+test_jsonl: /home/yxfeng/cscwd27_loopfuse/data/weibo/test.jsonl
+image_root: ""
+val_ratio: 0.1
+max_text_length: 512
+batch_size: 32
+num_workers: 4
+epochs: 50
+lr: 2.0e-5
+min_lr: 2.0e-6
+weight_decay: 1.0e-4
+patience: 5
+seed: 42
+output_dir: outputs/weibo_cnclip_loop2_mid50k
+# Full-tower loop 2, initialized from the loop-2 mid-train checkpoint at step 50000.
+# Encoder tensors that match are overwritten. loop_gate and the two-layer projection
+# are not in that checkpoint and stay at their LoopFuse init.
+num_loops: 2
+d_model: 512
+debate_dim: 0
+grad_accum_steps: 1
+amp: true
+max_grad_norm: 1.0
+freeze_backbone: false
+swanlab_mode: disabled
+swanlab_project: loopfuse
+run_name: weibo-cnclip-loop2-mid50k
+init_checkpoint: /data3/yxfeng/experiments/cnclip_midtrain_l2_lr5e-5/step_50000.pt

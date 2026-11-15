@@ -243,12 +243,15 @@ class LoopFuseTrainer:
     def _forward_loss(self, batch: dict) -> torch.Tensor:
         enabled = self.amp_dtype is not None
         with torch.autocast(device_type=self.device.type, dtype=self.amp_dtype or torch.float32, enabled=enabled):
-            logits = self.model(
-                input_ids=batch["input_ids"],
-                attention_mask=batch["attention_mask"],
-                pixel_values=batch["pixel_values"],
-                num_loops=self.num_loops,
-            )
+            kwargs = {
+                "input_ids": batch["input_ids"],
+                "attention_mask": batch["attention_mask"],
+                "pixel_values": batch["pixel_values"],
+                "num_loops": self.num_loops,
+            }
+            if "debate_hidden" in batch:
+                kwargs["debate_hidden"] = batch["debate_hidden"]
+            logits = self.model(**kwargs)
             return self.loss_fn(logits, batch["labels"])
 
     @staticmethod
@@ -261,6 +264,8 @@ class LoopFuseTrainer:
     def _is_non_clip_parameter(name: str) -> bool:
         return (
             name.startswith("fuse.")
+            or name.startswith("fuse_clip.")
+            or name.startswith("fuse_debate.")
             or name.startswith("classifier.")
             or name.startswith("gate.")
             or ".gate." in name
@@ -272,6 +277,8 @@ class LoopFuseTrainer:
             name.startswith("lora.")
             or ".lora." in name
             or name.startswith("fuse.")
+            or name.startswith("fuse_clip.")
+            or name.startswith("fuse_debate.")
             or name.startswith("classifier.")
             or name.startswith("gate.")
             or ".gate." in name

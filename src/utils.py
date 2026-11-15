@@ -8,7 +8,7 @@ import torch
 import yaml
 from torch.utils.data import DataLoader, DistributedSampler
 
-from .data import LoopFuseDataset, load_jsonl_samples, loopfuse_collator, stratified_split
+from .data import LoopFuseDataset, load_debate_table, load_jsonl_samples, loopfuse_collator, stratified_split
 
 
 def set_seed(seed: int) -> None:
@@ -91,7 +91,11 @@ def make_loader(
         "shuffle": shuffle and sampler is None,
         "sampler": sampler,
         "num_workers": int(config.get("num_workers", 0)),
-        "collate_fn": loopfuse_collator(processor, int(config["max_text_length"])),
+        "collate_fn": loopfuse_collator(
+            processor,
+            int(config["max_text_length"]),
+            config.get("_debate_hidden"),
+        ),
         "pin_memory": torch.cuda.is_available(),
         "drop_last": False,
         "generator": generator,
@@ -111,6 +115,8 @@ def build_dataloaders(
     world_size: int = 1,
     is_main: bool = True,
 ) -> tuple[DataLoader, DataLoader | None, DataLoader | None, DistributedSampler | None]:
+    debate_path = str(config.get("debate_hidden") or "").strip()
+    config["_debate_hidden"] = load_debate_table(debate_path) if debate_path else None
     splits = prepare_splits(config)
     if is_main:
         missing = splits["missing"]
@@ -249,12 +255,15 @@ def run_epoch_eval(model, loader, device, num_loops: int = 3) -> tuple[dict[str,
     y_pred: list[int] = []
     for batch in loader:
         batch = move_batch(batch, device)
-        logits = model(
-            input_ids=batch["input_ids"],
-            attention_mask=batch["attention_mask"],
-            pixel_values=batch["pixel_values"],
-            num_loops=num_loops,
-        )
+        kwargs = {
+            "input_ids": batch["input_ids"],
+            "attention_mask": batch["attention_mask"],
+            "pixel_values": batch["pixel_values"],
+            "num_loops": num_loops,
+        }
+        if "debate_hidden" in batch:
+            kwargs["debate_hidden"] = batch["debate_hidden"]
+        logits = model(**kwargs)
         y_true.extend(batch["labels"].detach().cpu().tolist())
         y_pred.extend(logits.argmax(dim=-1).detach().cpu().tolist())
     return score_predictions(y_true, y_pred), report_predictions(y_true, y_pred)
