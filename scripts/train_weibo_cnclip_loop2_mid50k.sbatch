@@ -34,7 +34,7 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 PY=/home/yxfeng/miniconda3/envs/www27/bin/python
 NPROC="${NPROC:-4}"
 SEEDS="${SEEDS:-0 1 2}"
-OUT="${OUT:-outputs/weibo_cnclip_loop2_mid50k}"
+OUT="${OUT:-outputs/weibo_cnclip_loop2_mid50k_gate}"
 LOOPS="${LOOPS:-2}"
 LR="${LR:-2e-5}"
 MIN_LR="${MIN_LR:-2e-6}"
@@ -43,12 +43,12 @@ MIN_LR="${MIN_LR:-2e-6}"
 MICRO="${MICRO:-8}"
 ACCUM="${ACCUM:-4}"
 INIT_CKPT="${INIT_CKPT:-/data3/yxfeng/experiments/cnclip_midtrain_l2_lr5e-5/step_50000.pt}"
-SUMMARY="logs/weibo_cnclip_loop2_mid50k.log"
+SUMMARY="logs/weibo_cnclip_loop2_mid50k_gate.log"
 
 echo "START $(date) host=$(hostname) loops=${LOOPS} seeds=${SEEDS} nproc=${NPROC} lr=${LR} micro=${MICRO} init=${INIT_CKPT}" | tee "$SUMMARY"
 
 for seed in ${SEEDS}; do
-  log="logs/weibo_cnclip_loop2_mid50k_seed${seed}.log"
+  log="logs/weibo_cnclip_loop2_mid50k_gate_seed${seed}.log"
   echo "===== loop=${LOOPS} seed=${seed} $(date) =====" | tee -a "$SUMMARY"
   rm -rf "${OUT}/seed${seed}"
   "$PY" -m torch.distributed.run \
@@ -57,7 +57,7 @@ for seed in ${SEEDS}; do
     --master_port="${MASTER_PORT:-29891}" \
     trainer.py --config=weibo_cnclip_loop2_mid50k \
     output_dir="${OUT}/seed${seed}" \
-    run_name="weibo_cnclip_loop2_mid50k_seed${seed}" \
+    run_name="weibo_cnclip_loop2_mid50k_gate_seed${seed}" \
     num_loops="${LOOPS}" epochs=50 patience=5 max_text_length=512 \
     batch_size="${MICRO}" grad_accum_steps="${ACCUM}" num_workers=0 \
     model_type=chinese backbone=chinese debate_dim=0 d_model=512 \

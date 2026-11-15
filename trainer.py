@@ -193,15 +193,39 @@ class LoopFuseTrainer:
         current = model.state_dict()
         mapped = {}
         skipped = []
+        gate_bias = None
         for key, value in source.items():
             name = key[7:] if key.startswith("module.") else key
             if name in current and tuple(current[name].shape) == tuple(value.shape):
                 mapped[name] = value
-            else:
-                skipped.append(name)
+                continue
+            targets = _midtrain_gate_targets(name)
+            placed = False
+            for target in targets:
+                if target in current and tuple(current[target].shape) == tuple(value.shape):
+                    mapped[target] = value
+                    placed = True
+            if placed:
+                if name == "text_encoder.gate.2.bias" and value.numel() == 1:
+                    gate_bias = float(value.detach().reshape(()))
+                continue
+            skipped.append(name)
+        if any(name.startswith("text_encoder.loop_gate.1.") for name in mapped):
+            # LoopFuse inserts a LayerNorm in front of the pretrained Linear-ReLU-Linear.
+            # Identity so the copied gate sees the same hidden state it was trained on.
+            for prefix in ("text_encoder", "vision_encoder"):
+                weight = f"{prefix}.loop_gate.0.weight"
+                bias = f"{prefix}.loop_gate.0.bias"
+                if weight in current and weight not in mapped:
+                    mapped[weight] = torch.ones_like(current[weight])
+                    mapped[bias] = torch.zeros_like(current[bias])
         model.load_state_dict(mapped, strict=False)
         if self.is_main:
-            print(f"init_checkpoint {path} loaded {len(mapped)} tensors, skipped {len(skipped)}", flush=True)
+            gate = f", gate_bias {gate_bias:.6f}" if gate_bias is not None else ""
+            print(
+                f"init_checkpoint {path} loaded {len(mapped)} tensors, skipped {len(skipped)}{gate}",
+                flush=True,
+            )
 
     def _build_optimizer(self) -> torch.optim.Optimizer:
         lr = float(self.config["lr"])
@@ -431,6 +455,34 @@ class LoopFuseTrainer:
         self.logger.finish()
         if dist.is_initialized():
             dist.destroy_process_group()
+
+
+def _midtrain_gate_targets(name: str) -> tuple[str, ...]:
+    """Map the mid-train text gate onto both LoopFuse loop gates.
+
+    The checkpoint gate is Linear, ReLU, Linear. LoopFuse stores that as
+    loop_gate indices 1 and 3 because index 0 is a LayerNorm. The vision
+    tower was not given its own gate, so it starts from the text gate.
+    """
+    aliases = {
+        "text_encoder.gate.0.weight": (
+            "text_encoder.loop_gate.1.weight",
+            "vision_encoder.loop_gate.1.weight",
+        ),
+        "text_encoder.gate.0.bias": (
+            "text_encoder.loop_gate.1.bias",
+            "vision_encoder.loop_gate.1.bias",
+        ),
+        "text_encoder.gate.2.weight": (
+            "text_encoder.loop_gate.3.weight",
+            "vision_encoder.loop_gate.3.weight",
+        ),
+        "text_encoder.gate.2.bias": (
+            "text_encoder.loop_gate.3.bias",
+            "vision_encoder.loop_gate.3.bias",
+        ),
+    }
+    return aliases.get(name, ())
 
 
 def _load_config(argv: list[str] | None = None) -> dict:
